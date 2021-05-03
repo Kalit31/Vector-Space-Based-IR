@@ -40,7 +40,7 @@ def get_query(query):
 
 if __name__ == "__main__":
     while(1):
-        instructions = 'Press 1 to enter your own query \nPress 2 to get result for a pre-defined query \nPress any other button to exit\nEnter your input '
+        instructions = 'Press 1 to enter your own query \nPress 2 to get result for a pre-defined query \nPress any other button to exit\n\nEnter your input: '
 
         x = input(instructions)
         if x == '1':
@@ -51,3 +51,4 @@ if __name__ == "__main__":
             get_query(query)
         else:
             quit(0)
+        print()

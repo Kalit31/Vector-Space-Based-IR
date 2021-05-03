@@ -263,13 +263,20 @@ def process_query(query_string):
 
 
 def main():
-    while(True):
-        q = input("\nInput query(Ctrl-C to exit): ")
-        print("Retrieving relevant documents...")
-        results = process_query(q)
-        print(tabulate(results, headers=[
-              "Score", "Document ID", "Document Name"]))
-
+    while(1):
+      instructions = 'Press 1 to enter your own query \nPress 2 to get result for a pre-defined query \nPress any other button to exit\n\nEnter your input: '
+      x = input(instructions)
+      q = ""
+      if x == '1':
+        q = input("\nEnter the query you want to search: ")
+      elif x == '2':
+        q = "Space exploration"
+      else:
+        quit(0)
+      print("\nRetrieving relevant documents...")
+      results = process_query(q)
+      print(tabulate(results, headers=["Score", "Document ID", "Document Name"]))
+      print()
 
 if __name__ == "__main__":
     main()
