@@ -10,6 +10,9 @@ Original file is located at
 # from google.colab import drive
 # drive.mount('/content/drive',force_remount=True)
 
+import warnings
+from tabulate import tabulate
+from nltk.corpus import wordnet
 import nltk
 from nltk.tokenize import word_tokenize
 import numpy as np
@@ -19,9 +22,6 @@ nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
 nltk.download('universal_tagset')
 nltk.download('wordnet')
-from nltk.corpus import wordnet
-from tabulate import tabulate
-import warnings
 warnings.filterwarnings("ignore")
 
 '''
@@ -31,12 +31,14 @@ warnings.filterwarnings("ignore")
   url: document url
   tf: term frequency vector for the document
 '''
+
+
 class document:
-  def __init__(self,tag,id):
-    self.id = id
-    self.doc_name = tag["title"]
-    self.url = tag["url"]
-    self.tf = np.zeros((len(vocabulary),1))
+    def __init__(self, tag, id):
+        self.id = id
+        self.doc_name = tag["title"]
+        self.url = tag["url"]
+        self.tf = np.zeros((len(vocabulary), 1))
 
 
 '''
@@ -44,10 +46,13 @@ class document:
   id: id assigned to word
   word: original word
 '''
+
+
 class term:
-  def __init__(self,id,word):
-    self.id=id
-    self.word=word
+    def __init__(self, id, word):
+        self.id = id
+        self.word = word
+
 
 def openFile(filePath):
     fp = open(filePath, "rb")
@@ -55,264 +60,216 @@ def openFile(filePath):
     fp.close()
     return data
 
-all_docs=openFile('documents')
-vocabulary=openFile('vocabulary')
-reverse_vocabulary=openFile('reverse-vocabulary')
-inverted_index=openFile('inverted-index')
+
+all_docs = openFile('documents')
+vocabulary = openFile('vocabulary')
+reverse_vocabulary = openFile('reverse-vocabulary')
+inverted_index = openFile('inverted-index')
+
 
 def clean_text(file_text):
-  '''
-    Takes a text as input and returns a list of splitted tokens, excluding punctuations
+    '''
+      Takes a text as input and returns a list of splitted tokens, excluding punctuations
 
-    eg: s='Good muffins cost $3.88\nin New York.  Please buy me two of them.\n\n Thanks.'
-        returns ['Good', 'muffins', 'cost', '3.88', 'in', 'New', 'York','Please', 'buy', 'me', 'two', 'of', 'them', 'Thanks']
-  '''
+      eg: s='Good muffins cost $3.88\nin New York.  Please buy me two of them.\n\n Thanks.'
+          returns ['Good', 'muffins', 'cost', '3.88', 'in', 'New', 'York','Please', 'buy', 'me', 'two', 'of', 'them', 'Thanks']
+    '''
 
-  #Split text into tokens
-  tokens=nltk.tokenize.word_tokenize(file_text)
-  final_tokens=[]
-  for token in tokens:
-    # Add into final_tokens after lower casing the token if it is not a punctuation symbol
-    if(token not in string.punctuation):
-      token=token.lower()
-      final_tokens.append(token)
-  return final_tokens
+    # Split text into tokens
+    tokens = nltk.tokenize.word_tokenize(file_text)
+    final_tokens = []
+    for token in tokens:
+        # Add into final_tokens after lower casing the token if it is not a punctuation symbol
+        if(token not in string.punctuation):
+            token = token.lower()
+            final_tokens.append(token)
+    return final_tokens
+
 
 '''
   Query class structure:
   query_tokens:  tokens in the query text
   query_vector: document title
 '''
-class query:
-  def __init__(self,phrase):
-    self.query_tokens = clean_text(phrase)
-    self.query_vector=np.zeros((len(vocabulary),1))
-    self.get_query_vector()
 
-  def get_query_vector(self):
-    query_tokens=self.query_tokens
-    for token in query_tokens:
-      if(token not in reverse_vocabulary.keys()):
-        continue
-      token_id=reverse_vocabulary[token].id
-      self.query_vector[token_id]+=1
+
+class query:
+    def __init__(self, phrase):
+        self.query_tokens = clean_text(phrase)
+        self.query_vector = np.zeros((len(vocabulary), 1))
+        self.get_query_vector()
+
+    def get_query_vector(self):
+        query_tokens = self.query_tokens
+        for token in query_tokens:
+            if(token not in reverse_vocabulary.keys()):
+                continue
+            token_id = reverse_vocabulary[token].id
+            self.query_vector[token_id] += 1
+
 
 def calc_idf():
-  '''
-    For each term present in the vocabulary, the idf score is calculated 
-    using the formula: idf = (total number of documents)/(number of documents in which the term is present)
-  '''
-  idf_vector = np.zeros((len(vocabulary),1))
-  N=len(all_docs)
-  for i in range(len(vocabulary)):
-    idf_vector[i] = N/len(inverted_index[vocabulary[i].word])
+    '''
+      For each term present in the vocabulary, the idf score is calculated 
+      using the formula: idf = (total number of documents)/(number of documents in which the term is present)
+    '''
+    idf_vector = np.zeros((len(vocabulary), 1))
+    N = len(all_docs)
+    for i in range(len(vocabulary)):
+        idf_vector[i] = N/len(inverted_index[vocabulary[i].word])
 
-  idf_vector = np.log10(idf_vector)
-  return idf_vector
+    idf_vector = np.log10(idf_vector)
+    return idf_vector
+
 
 idf_vector = calc_idf()
 
-def calc_i(vector):
-  return np.maximum(1+np.log10(vector),np.zeros(vector.shape) ) 
 
-def cal_lnc_ltc(doc_vector,query_vector):
-  '''
-  Computes lnc.ltc score for the given document and query
-  '''
-  l_doc_vector = calc_i(doc_vector)
-  c_doc_vector = l_doc_vector/np.linalg.norm(l_doc_vector)
-  l_query_vector=calc_i(query_vector)
-  t_query_vector=np.multiply(l_query_vector,idf_vector)
-  norm=np.linalg.norm(t_query_vector)
-  c_query_vector=t_query_vector
-  if norm !=0:
-    c_query_vector=t_query_vector/norm
-  score=np.dot(c_doc_vector.reshape(c_doc_vector.shape[0]),c_query_vector.reshape(c_query_vector.shape[0]))
-  return score
+def calc_i(vector):
+    return np.maximum(1+np.log10(vector), np.zeros(vector.shape))
+
+
+def cal_lnc_ltc(doc_vector, query_vector):
+    '''
+    Computes lnc.ltc score for the given document and query
+    '''
+    l_doc_vector = calc_i(doc_vector)
+    c_doc_vector = l_doc_vector/np.linalg.norm(l_doc_vector)
+    l_query_vector = calc_i(query_vector)
+    t_query_vector = np.multiply(l_query_vector, idf_vector)
+    norm = np.linalg.norm(t_query_vector)
+    c_query_vector = t_query_vector
+    if norm != 0:
+        c_query_vector = t_query_vector/norm
+    score = np.dot(c_doc_vector.reshape(
+        c_doc_vector.shape[0]), c_query_vector.reshape(c_query_vector.shape[0]))
+    return score
+
 
 def get_acc_tokens(query_string):
-  '''
-    Takes a string as input, tokenizes it and returns a set of tokens
-    which are either nouns, verbs, adverbs or adjectives
-  '''
-  tokens=nltk.word_tokenize(query_string)
-  tags=nltk.pos_tag(tokens, tagset='universal')
-  acc_tokens=set()
-  acc_tags=['NOUN', 'VERB', 'ADV', 'ADJ']
-  for token,tag in tags:
-    if tag in acc_tags:
-      acc_tokens.add(token)
-  return acc_tokens
+    '''
+      Takes a string as input, tokenizes it and returns a set of tokens
+      which are either nouns, verbs, adverbs or adjectives
+    '''
+    tokens = nltk.word_tokenize(query_string)
+    tags = nltk.pos_tag(tokens, tagset='universal')
+    acc_tokens = set()
+    acc_tags = ['NOUN', 'VERB', 'ADV', 'ADJ']
+    for token, tag in tags:
+        if tag in acc_tags:
+            acc_tokens.add(token)
+    return acc_tokens
+
 
 def get_synonyms(acc_tokens):
-  '''
-    Takes the set of accepted tokens as input, and returns a set which contains 
-    synonyms of all the tokens
-    Note: Synonyms which do not exist in the vocabulary of the corpus are excluded
-  '''
-  synonyms=set()
-  for acc_token in acc_tokens:
-    syns = wordnet.synsets(acc_token)
-    for syn in syns:
-      for syne in syn.lemma_names():
-        if syne in acc_tokens:
-          continue
-        if syne not in reverse_vocabulary:
-          continue
-        synonyms.add(syne)
-  return synonyms
+    '''
+      Takes the set of accepted tokens as input, and returns a set which contains 
+      synonyms of all the tokens
+      Note: Synonyms which do not exist in the vocabulary of the corpus are excluded
+    '''
+    synonyms = set()
+    for acc_token in acc_tokens:
+        syns = wordnet.synsets(acc_token)
+        for syn in syns:
+            for syne in syn.lemma_names():
+                if syne in acc_tokens:
+                    continue
+                if syne not in reverse_vocabulary:
+                    continue
+                synonyms.add(syne)
+    return synonyms
+
 
 def get_hypernym_queries(acc_tokens, synonyms):
-  '''
-    Takes the set of accepted tokens and the set of synonyms as input.
-    Uses hypernyms to generate queries using the hyponyms of the accepted tokens.
-    Returns a list of the generated queries.
-  '''
-  queries=[]
-  for acc_token in acc_tokens:
-    syns = wordnet.synsets(acc_token)
-    for syn in syns:
-      if len(syn.hypernyms())==0:
-        print('No hypernyms found')
-        continue
-      for syne in syn.hypernyms()[0].lemma_names():
-        if syne in acc_tokens:
-          continue
-        if syne not in reverse_vocabulary:
-          continue
-        if syn in synonyms:
-          continue
-        queries.append(query(syne))
-  return queries
+    '''
+      Takes the set of accepted tokens and the set of synonyms as input.
+      Uses hypernyms to generate queries using the hyponyms of the accepted tokens.
+      Returns a list of the generated queries.
+    '''
+    queries = []
+    for acc_token in acc_tokens:
+        syns = wordnet.synsets(acc_token)
+        for syn in syns:
+            if len(syn.hypernyms()) == 0:
+                print('No hypernyms found')
+                continue
+            for syne in syn.hypernyms()[0].lemma_names():
+                if syne in acc_tokens:
+                    continue
+                if syne not in reverse_vocabulary:
+                    continue
+                if syn in synonyms:
+                    continue
+                queries.append(query(syne))
+    return queries
 
-def get_hypernym_queries_opt(acc_tokens, synonyms):
-  '''
-    Takes the set of accepted tokens and the set of synonyms as input.
-    Uses hypernyms to generate queries using the hyponyms of the accepted tokens.
-    Returns a list of the generated queries.
-  '''
-  queries=[]
-  hyp_query=""
-  for acc_token in acc_tokens:
-    syns = wordnet.synsets(acc_token)
-    for syn in syns:
-      if len(syn.hypernyms())==0:
-        print('No hypernyms found')
-        continue
-      for syne in syn.hypernyms()[0].lemma_names():
-        if syne in acc_tokens:
-          continue
-        if syne not in reverse_vocabulary:
-          continue
-        if syn in synonyms:
-          continue
-        hyp_query+=(syne+" ")
-  queries.append(query(syne))
-  return queries
 
 def run_synonym_query(orig_query, queries, weight):
-  '''
-    Calculates the score of each document using the original query and by running 
-    a query for each synonym.
-    Returns a list of documents sorted by document id.
-  '''
-  scored_docs=[]
-  for doc in all_docs.values():
-    score = weight*cal_lnc_ltc(doc.tf,orig_query.query_vector)
-    for quer in queries:
-      quer_score=cal_lnc_ltc(doc.tf, quer.query_vector)
-      score+=(quer_score*(1-weight))
-    scored_docs.append([score, doc.id, all_docs[doc.id].doc_name])
-  return scored_docs
+    '''
+      Calculates the score of each document using the original query and by running 
+      a query for each synonym.
+      Returns a list of documents sorted by document id.
+    '''
+    scored_docs = []
+    for doc in all_docs.values():
+        score = weight*cal_lnc_ltc(doc.tf, orig_query.query_vector)
+        for quer in queries:
+            quer_score = cal_lnc_ltc(doc.tf, quer.query_vector)
+            score += (quer_score*(1-weight))
+        scored_docs.append([score, doc.id, all_docs[doc.id].doc_name])
+    return scored_docs
+
 
 def run_hypernym_query(acc_tokens, synonyms, queries, weight, scored_docs):
-  '''
-    Calculates the score of each document using the hyponyms of the tokens and 
-    adds it to the score calculated using the original query and the synonyms.
-    Returns a list of documents sorted by score
-  '''
-  print('Using hypernyms')
-  queries=get_hypernym_queries(acc_tokens, synonyms)
-  for i, doc in enumerate(all_docs.values()):
-    for quer in queries:
-      quer_score=cal_lnc_ltc(doc.tf, quer.query_vector)
-      scored_docs[i][0]+=(quer_score*(1-weight))
-  scored_docs.sort(reverse=True)
-  return scored_docs
+    '''
+      Calculates the score of each document using the hyponyms of the tokens and 
+      adds it to the score calculated using the original query and the synonyms.
+      Returns a list of documents sorted by score
+    '''
+    print('Using hypernyms')
+    queries = get_hypernym_queries(acc_tokens, synonyms)
+    for i, doc in enumerate(all_docs.values()):
+        for quer in queries:
+            quer_score = cal_lnc_ltc(doc.tf, quer.query_vector)
+            scored_docs[i][0] += (quer_score*(1-weight))
+    scored_docs.sort(reverse=True)
+    return scored_docs
 
-def run_hypernym_query_opt(acc_tokens, synonyms, queries, weight, scored_docs):
-  '''
-    Calculates the score of each document using the hyponyms of the tokens and 
-    adds it to the score calculated using the original query and the synonyms.
-    Returns a list of documents sorted by score
-  '''
-  queries=get_hypernym_queries_opt(acc_tokens, synonyms)
-  for i, doc in enumerate(all_docs.values()):
-    for quer in queries:
-      quer_score=cal_lnc_ltc(doc.tf, quer.query_vector)
-      scored_docs[i][0]+=(quer_score*(1-weight))
-  scored_docs.sort(reverse=True)
-  return scored_docs
 
 def process_query(query_string):
-  '''
-    Processes the query and uses synonyms to augment the original query.
-    If insufficient documents are retrieved, hyponyms are also used.
-    Returns a sorted list of 10 documents with the highest scores.
-  '''
-  weight=0.90
-  retrieve_cnt=min(len(all_docs), 10)
-  orig_query=query(query_string)
-  acc_tokens=get_acc_tokens(query_string)
-  synonyms=get_synonyms(acc_tokens)
-  queries=[]
-  for synonym in synonyms:
-    queries.append(query(synonym))
-  scored_docs=run_synonym_query(orig_query, queries, weight)
-  sorted_docs=scored_docs.copy()
-  sorted_docs.sort(reverse=True)
-  retrieved_ten_docs=True
-  for i in range(0, retrieve_cnt):
-    if sorted_docs[i][0]==0.0:
-      retrieved_ten_docs=False
-  if retrieved_ten_docs==True:
-    return sorted_docs[:retrieve_cnt] 
-  return run_hypernym_query(acc_tokens, synonyms, queries, weight, scored_docs)[:retrieve_cnt]
-
-def process_query_opt(query_string):
-  '''
-    Processes the query and uses synonyms to augment the original query.
-    If insufficient documents are retrieved, hyponyms are also used.
-    Returns a sorted list of 10 documents with the highest scores.
-  '''
-  weight=0.90
-  retrieve_cnt=min(len(all_docs), 10)
-  orig_query=query(query_string)
-  acc_tokens=get_acc_tokens(query_string)
-  synonyms=get_synonyms(acc_tokens)
-  queries=[]
-  syn_query=""
-  for synonym in synonyms:
-    syn_query+=(synonym+" ")
-  queries.append(query(syn_query))
-  scored_docs=run_synonym_query(orig_query, queries, weight)
-  sorted_docs=scored_docs.copy()
-  sorted_docs.sort(reverse=True)
-  retrieved_ten_docs=True
-  for i in range(0, retrieve_cnt):
-    if sorted_docs[i][0]==0.0:
-      retrieved_ten_docs=False
-  if retrieved_ten_docs==True:
-    return sorted_docs[:retrieve_cnt] 
-  return run_hypernym_query_opt(acc_tokens, synonyms, queries, weight, scored_docs)[:retrieve_cnt]
+    '''
+      Processes the query and uses synonyms to augment the original query.
+      If insufficient documents are retrieved, hyponyms are also used.
+      Returns a sorted list of 10 documents with the highest scores.
+    '''
+    weight = 0.90
+    retrieve_cnt = min(len(all_docs), 10)
+    orig_query = query(query_string)
+    acc_tokens = get_acc_tokens(query_string)
+    synonyms = get_synonyms(acc_tokens)
+    queries = []
+    for synonym in synonyms:
+        queries.append(query(synonym))
+    scored_docs = run_synonym_query(orig_query, queries, weight)
+    sorted_docs = scored_docs.copy()
+    sorted_docs.sort(reverse=True)
+    retrieved_ten_docs = True
+    for i in range(0, retrieve_cnt):
+        if sorted_docs[i][0] == 0.0:
+            retrieved_ten_docs = False
+    if retrieved_ten_docs == True:
+        return sorted_docs[:retrieve_cnt]
+    return run_hypernym_query(acc_tokens, synonyms, queries, weight, scored_docs)[:retrieve_cnt]
 
 
 def main():
-  while(True):
-    q = input("\nInput query(Ctrl-C to exit): ")
-    print("Retrieving relevant documents...")
-    results = process_query(q)
-    print(tabulate(results, headers=["Score", "Document ID", "Document Name"]))
-  
+    while(True):
+        q = input("\nInput query(Ctrl-C to exit): ")
+        print("Retrieving relevant documents...")
+        results = process_query(q)
+        print(tabulate(results, headers=[
+              "Score", "Document ID", "Document Name"]))
+
+
 if __name__ == "__main__":
-  main()
+    main()
