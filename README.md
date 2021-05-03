@@ -1,8 +1,13 @@
 # Vector Space Based Information Retrieval System
 
-Use python version >= 3.6
+This repository contains the project "Vector Space Based Information Retrieval System" completed in the partial fulfillment of the course Information Retrieval(CS F469).
+
+#### For more details regarding the problem statement, refer [problem statement](Problem-Statement.pdf)
+
 
 ## Execution Instructions
+
+Use python version >= 3.6
 
 1. Install required dependencies
 
@@ -60,7 +65,12 @@ Use python version >= 3.6
    Enter your input: q
 
 ```
+#### For more details about the methodology and results, refer to the [project report](Project-Report.pdf)
 
-
-  
+#### Created By
+- [Kalit Inani](https://github.com/Kalit31)
+- [Nisarg Vora](https://github.com/Nisarg2104)
+- [Harsh Sharma](https://github.com/saepenumero)  
+- [Rahil Jain](https://github.com/thunderbolt06)  
+- [Prateek Grover](https://github.com/prateekgrover-in)  
 
